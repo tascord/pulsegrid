@@ -1,0 +1,28 @@
+# PulseGrid VST Bridge — user systemd unit (Linux, headless-friendly)
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp bridge/pulsegrid-bridge.service ~/.config/systemd/user/
+#   # EDIT the ExecStart path below to point at your checkout:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now pulsegrid-bridge
+#   journalctl --user -u pulsegrid-bridge -f
+#
+# The bridge opens a virtual ALSA MIDI port ("PulseGrid VST Out") and a
+# WebSocket on port 8080 that the PulseGrid web UI connects to.
+
+[Unit]
+Description=PulseGrid VST Bridge (virtual MIDI + WebSocket)
+After=network.target sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+# >>> EDIT ME: absolute path to vst-bridge-linux.py <<<
+ExecStart=/usr/bin/python3 /path/to/music/bridge/vst-bridge-linux.py --port 8080 --midi-port "PulseGrid VST Out"
+Restart=on-failure
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

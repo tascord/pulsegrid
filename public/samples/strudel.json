@@ -1,0 +1,32 @@
+{
+  "_base": "/samples/",
+  "ry30_bd": [
+    "ry30-bd/Bassdrum-01.wav",
+    "ry30-bd/Bassdrum-02.wav",
+    "ry30-bd/Bassdrum-03.wav",
+    "ry30-bd/Bassdrum-04.wav",
+    "ry30-bd/Bassdrum-05.wav",
+    "ry30-bd/Bassdrum-06.wav",
+    "ry30-bd/Bassdrum-07.wav",
+    "ry30-bd/Bassdrum-08.wav",
+    "ry30-bd/Bassdrum-09.wav",
+    "ry30-bd/Bassdrum-10.wav",
+    "ry30-bd/Bassdrum-11.wav",
+    "ry30-bd/Bassdrum-12.wav",
+    "ry30-bd/Bassdrum-13.wav"
+  ],
+  "ry30_oh": [
+    "ry30-oh/Hat_Open-01.wav",
+    "ry30-oh/Hat_Open-02.wav",
+    "ry30-oh/Hat_Open-03.wav",
+    "ry30-oh/Hat_Open-04.wav"
+  ],
+  "ry30_cp": ["ry30-cp/Clap.wav"],
+  "ry30_hh": [
+    "ry30-hh/Hat_Closed-01.wav",
+    "ry30-hh/Hat_Closed-02.wav",
+    "ry30-hh/Hat_Pedal-01.wav",
+    "ry30-hh/Hat_Pedal-02.wav"
+  ],
+  "wt_digital_bad_day": ["wt/wt_bad_day.wav"]
+}

@@ -1,0 +1,576 @@
+@import "tailwindcss";
+
+/* Workstation tokens are intentionally unlayered so they can theme the
+   component utilities without making each drawer carry its own palette. */
+
+@theme inline {
+  --color-neutral-950: var(--pg-editor-bg);
+  --color-neutral-900: var(--pg-surface);
+  --color-neutral-800: var(--pg-surface-2);
+  --color-neutral-700: var(--pg-surface-3);
+  --color-neutral-600: var(--pg-border);
+  --color-neutral-500: var(--pg-faint);
+  --color-neutral-400: var(--pg-muted);
+  --color-neutral-300: var(--pg-text);
+  --color-neutral-200: var(--pg-text);
+  --color-neutral-100: var(--pg-text);
+  --color-neutral-50: var(--pg-text);
+  --color-emerald-400: var(--pg-accent);
+  --color-emerald-500: var(--pg-accent);
+  --color-emerald-600: var(--pg-accent);
+  --color-cyan-300: var(--pg-accent);
+  --color-cyan-400: var(--pg-accent);
+  --color-cyan-500: var(--pg-accent);
+  --color-cyan-800: var(--pg-border);
+  --color-cyan-950: var(--pg-surface-2);
+  --color-blue-400: var(--pg-accent);
+  --color-purple-400: var(--pg-accent);
+}
+
+:root {
+  --pg-bg: #111519;
+  --pg-bg-dots: rgba(255, 255, 255, 0.035);
+  --pg-surface: #181e23;
+  --pg-surface-2: #20282e;
+  --pg-surface-3: #2a343b;
+  --pg-border: #39454d;
+  --pg-border-soft: #2a3339;
+  --pg-text: #e8edf0;
+  --pg-muted: #a6b1b8;
+  --pg-faint: #87939b;
+  --pg-accent: #6cdbb6;
+  --pg-accent-ink: #10241d;
+  --pg-accent-2: #e6b96f;
+  --pg-accent-3: #a9c8df;
+  --pg-danger: #f07878;
+  --pg-ok: #6cdbb6;
+  --pg-warn: #e6b96f;
+  --pg-editor-bg: #12181c;
+  --pg-editor-gutter: #87939b;
+  --pg-keyword: #79dfbc;
+  --pg-method: #a9c8df;
+  --pg-string: #e6c98e;
+  --pg-string-punct: #aab7bd;
+  --pg-number: #d0b2df;
+  --pg-comment: #8d999f;
+  --pg-token-flash-bg: #6cdbb6;
+  --pg-token-flash-ink: #10241d;
+  --pg-header-bg: rgba(17, 21, 25, 0.96);
+  --pg-editor-font: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --pg-editor-size: 14px;
+  --pg-editor-lh: 25px;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: var(--pg-bg);
+  color: var(--pg-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background-image: none;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Panels, headers */
+.pg-panel {
+  background: var(--pg-surface);
+  border: 1px solid var(--pg-border-soft);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.pg-panel-header {
+  background: var(--pg-surface-2);
+  border-bottom: 1px solid var(--pg-border-soft);
+}
+.pg-header-blur {
+  background: var(--pg-header-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.pg-btn-accent {
+  background: var(--pg-accent);
+  color: var(--pg-accent-ink);
+  font-weight: 700;
+  border-radius: 5px;
+}
+.pg-btn-accent:hover { filter: brightness(1.04); }
+.pg-muted { color: var(--pg-muted); }
+.pg-faint { color: var(--pg-faint); }
+
+.pg-workstation button {
+  -webkit-tap-highlight-color: transparent;
+}
+.pg-workstation button:focus-visible,
+.pg-workstation input:focus-visible,
+.pg-workstation textarea:focus-visible {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: 2px;
+}
+
+.pg-workspace-resize-handle {
+  flex: 0 0 6px;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  cursor: col-resize;
+}
+.pg-workspace-resize-handle::before {
+  content: "";
+  width: 2px;
+  height: 44px;
+  border-radius: 2px;
+  background: var(--pg-border);
+  transition: background-color 0.15s ease, height 0.15s ease;
+}
+.pg-workspace-resize-handle:hover::before,
+.pg-workspace-resize-handle:focus-visible::before {
+  height: 64px;
+  background: var(--pg-accent);
+}
+
+@media (min-width: 1024px) {
+  .pg-inspector { flex: 0 0 var(--pg-inspector-width); }
+}
+
+/* Editor — TYPOGRAPHY ONLY (no background here: the textarea must stay
+   transparent so the highlight layer shows through). */
+.pg-editor {
+  font-family: var(--pg-editor-font);
+  font-size: var(--pg-editor-size);
+  line-height: var(--pg-editor-lh);
+  font-feature-settings: "liga" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0.005em;
+  tab-size: 2;
+}
+
+/* VSCode-style secondary cursors / selections (the primary selection keeps
+   the native textarea rendering; extras are painted on an overlay layer). */
+.pg-multi-sel {
+  position: absolute;
+  background: color-mix(in srgb, var(--pg-accent) 32%, transparent);
+  border-radius: 2px;
+}
+.pg-multi-caret {
+  position: absolute;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--pg-accent);
+  border-radius: 1px;
+  animation: pg-caret-blink 1.06s steps(2, start) infinite;
+}
+@keyframes pg-caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+/* Solid editor paint — apply ONLY to opaque wrapper surfaces. */
+.pg-editor-surface {
+  background: var(--pg-editor-bg);
+}
+.pg-editor-gutter {
+  background: color-mix(in srgb, var(--pg-editor-bg) 76%, var(--pg-surface));
+  color: var(--pg-faint);
+}
+/* Keep overlay lines + gutter numbers pixel-locked to the textarea rows. */
+.pg-editor-lines > div { line-height: var(--pg-editor-lh); }
+.pg-editor-lines > div > div { height: var(--pg-editor-lh); line-height: var(--pg-editor-lh); }
+.pg-gutter-lines > div { line-height: var(--pg-editor-lh); }
+
+.pg-tok-keyword { color: var(--pg-keyword); font-weight: 650; }
+.pg-tok-method { color: var(--pg-method); font-weight: 500; }
+.pg-tok-string { color: var(--pg-string); }
+.pg-tok-string-punct { color: var(--pg-string-punct); font-weight: 700; }
+.pg-tok-number { color: var(--pg-number); font-family: var(--pg-editor-font); }
+.pg-tok-comment { color: var(--pg-comment); font-style: italic; }
+.pg-tok-flash {
+  color: var(--pg-string);
+  background-color: color-mix(in srgb, var(--pg-accent) 9%, transparent);
+  border-radius: 2px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--pg-accent) 85%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* Event FX: token glow. Layout-shift-free by design: no font-weight, padding,
+   margin, transform, or display changes here — only paint (background,
+   text-shadow, box-shadow). Text color stays the readable string color. */
+:root {
+  --pg-fx-glow-alpha: 0.22;
+  --pg-fx-glow-blur: 8px;
+  --pg-fx-glow-spread: 0px;
+}
+html[data-fx="on"] .pg-tok-flash {
+  color: var(--pg-string);
+  background-color: color-mix(in srgb, var(--pg-accent) var(--pg-fx-glow-alpha), transparent);
+  border-radius: 2px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--pg-accent) 85%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--pg-accent) 70%, transparent);
+  box-shadow: 0 0 var(--pg-fx-glow-blur) var(--pg-fx-glow-spread) color-mix(in srgb, var(--pg-accent) 45%, transparent);
+}
+html[data-fx="off"] .pg-tok-flash {
+  text-shadow: none;
+  box-shadow: none;
+}
+
+/* Event FX layers inside the editor */
+.pg-fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pg-fx-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.pg-fx-floater {
+  position: absolute;
+  transform: translate(-50%, 0);
+  font-family: var(--pg-editor-font);
+  font-weight: 800;
+  white-space: nowrap;
+  animation: pg-fx-rise 0.9s ease-out forwards;
+  text-shadow:
+    0 0 8px color-mix(in srgb, var(--pg-accent) 80%, transparent),
+    0 0 18px color-mix(in srgb, var(--pg-accent) 45%, transparent);
+}
+@keyframes pg-fx-rise {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.7); }
+  15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -46px) scale(0.95); }
+}
+
+/* Beat pulse + impact shake are driven via the Web Animations API on the
+   editor frame (see CodeEditor) so they never remount React or shift layout. */
+
+/* Screen flash: brief wash over the editor on strong hits */
+.pg-fx-flash-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--pg-accent-2) 34%, transparent), color-mix(in srgb, var(--pg-accent) 14%, transparent) 55%, transparent 75%);
+  animation: pg-fx-wash 0.35s ease-out forwards;
+}
+@keyframes pg-fx-wash {
+  0% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* Line flash: full-width band across the triggering line, quick fade */
+.pg-fx-line-flash {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  border-left: 2px solid currentColor;
+  animation: pg-fx-linefade 0.48s ease-out forwards;
+}
+@keyframes pg-fx-linefade {
+  0% { opacity: 0.22; }
+  100% { opacity: 0; }
+}
+
+/* Edge glow: inset vignette that breathes on beats, slams on kicks.
+   Opacity is driven via WAAPI from the overlay; base is transparent. */
+.pg-fx-edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 18px 2px color-mix(in srgb, var(--pg-accent) 55%, transparent),
+    inset 0 0 46px 6px color-mix(in srgb, var(--pg-accent-2) 30%, transparent);
+}
+
+/* Bass bloom: soft full-editor swell on strong hits, slower than the flash */
+.pg-fx-bloom {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--pg-accent-2) 26%, transparent), color-mix(in srgb, var(--pg-accent) 10%, transparent) 55%, transparent 80%);
+  animation: pg-fx-bloom 0.6s ease-out forwards;
+}
+@keyframes pg-fx-bloom {
+  0% { opacity: 0; transform: scale(0.96); }
+  25% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(1.06); }
+}
+
+/* Glitch bars: thin RGB-split slices that jitter horizontally */
+.pg-fx-glitch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.pg-fx-glitch-bar {
+  position: absolute;
+  left: -4%;
+  right: -4%;
+  opacity: 0.55;
+  animation: pg-fx-glitch 0.22s steps(3) forwards;
+}
+@keyframes pg-fx-glitch {
+  0% { opacity: 0.6; transform: translateX(var(--pg-glitch-shift, 8px)); }
+  50% { opacity: 0.35; transform: translateX(calc(var(--pg-glitch-shift, 8px) * -0.7)); }
+  100% { opacity: 0; transform: translateX(0); }
+}
+
+/* Combo streak readout: persistent sonner-style stack top-right.
+   The current number punches in place while outgoing numbers detach and
+   fly off like particles. */
+.pg-fx-combo {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  pointer-events: none;
+  font-family: var(--pg-editor-font);
+}
+/* Grid-overlay stack: every number (live + ghosts) shares one right-aligned
+   cell, so outgoing digits start pixel-exact under the current one. */
+.pg-fx-combo-stack {
+  position: relative;
+  display: inline-grid;
+  justify-items: end;
+  min-width: 4ch;
+  text-align: right;
+}
+.pg-fx-combo-stack > * {
+  grid-area: 1 / 1;
+}
+.pg-fx-combo-n {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--pg-accent-2);
+  text-shadow:
+    0 0 10px color-mix(in srgb, var(--pg-accent-2) 80%, transparent),
+    0 0 26px color-mix(in srgb, var(--pg-accent-2) 40%, transparent);
+  animation: pg-fx-combo-n-in 0.26s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.pg-fx-combo-ghost {
+  justify-self: end;
+  z-index: 0;
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--pg-accent-2);
+  opacity: 0.6;
+  text-shadow: none;
+  animation: pg-fx-combo-ghost-fly 0.65s ease-out forwards;
+}
+.pg-fx-combo-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pg-muted);
+}
+/* Heat tiers: the readout grows and shifts hue as the streak climbs. */
+.pg-fx-combo.is-warm .pg-fx-combo-n { font-size: 25px; }
+.pg-fx-combo.is-hot .pg-fx-combo-n,
+.pg-fx-combo.is-hot .pg-fx-combo-ghost {
+  font-size: 29px;
+  color: var(--pg-accent);
+  text-shadow:
+    0 0 12px color-mix(in srgb, var(--pg-accent) 85%, transparent),
+    0 0 32px color-mix(in srgb, var(--pg-accent) 45%, transparent);
+}
+.pg-fx-combo.is-mega .pg-fx-combo-n,
+.pg-fx-combo.is-mega .pg-fx-combo-ghost {
+  font-size: 34px;
+  color: #fff;
+  text-shadow:
+    0 0 14px var(--pg-accent-2),
+    0 0 38px color-mix(in srgb, var(--pg-accent) 70%, transparent);
+}
+@keyframes pg-fx-combo-n-in {
+  0% { opacity: 0; transform: translateY(14px) scale(0.55); }
+  55% { opacity: 1; transform: translateY(-2px) scale(1.16); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pg-fx-combo-ghost-fly {
+  0% { opacity: 0.6; transform: translate(0, 0) scale(0.9) rotate(0deg); }
+  100% {
+    opacity: 0;
+    transform: translate(var(--pg-ghost-dx, 90px), var(--pg-ghost-dy, -70px))
+      scale(0.35) rotate(var(--pg-ghost-rot, 20deg));
+  }
+}
+
+/* Milestone burst badge: pinned directly under the combo readout so it can
+   never drift away from it. Pill backdrop keeps it legible over code. */
+.pg-fx-milestone-inline {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 12px 5px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pg-accent-2) 45%, transparent);
+  background: color-mix(in srgb, #000 62%, transparent);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+  font-family: var(--pg-editor-font);
+  white-space: nowrap;
+  animation: pg-fx-milestone-inline 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.pg-fx-milestone-inline-n {
+  font-size: 24px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-shadow:
+    0 0 12px var(--pg-accent-2),
+    0 0 30px color-mix(in srgb, var(--pg-accent) 80%, transparent);
+}
+.pg-fx-milestone-inline-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--pg-accent-2);
+}
+@keyframes pg-fx-milestone-inline {
+  0% { opacity: 0; transform: scale(0.5) translateY(6px); }
+  14% { opacity: 1; transform: scale(1.1) translateY(0); }
+  24% { opacity: 1; transform: scale(1) translateY(0); }
+  72% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(1.03) translateY(-10px); }
+}
+
+/* Energy bar: bottom-anchored meter that pumps with event density */
+.pg-fx-energy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--pg-accent) 12%, transparent);
+  overflow: hidden;
+}
+.pg-fx-energy-fill {
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--pg-accent), var(--pg-accent-2), var(--pg-accent-3));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--pg-accent) 70%, transparent);
+  transition: transform 60ms linear, opacity 120ms linear;
+}
+
+
+
+@media (prefers-reduced-motion: reduce) {
+  .pg-fx-floater,
+  .pg-fx-flash-wash,
+  .pg-fx-line-flash,
+  .pg-fx-bloom,
+  .pg-fx-glitch-bar,
+  .pg-fx-combo-n,
+  .pg-fx-combo-ghost,
+  .pg-fx-milestone-inline {
+    animation: none;
+  }
+}
+
+/* Current caret line band */
+.pg-current-line {
+  background: color-mix(in srgb, var(--pg-accent) 5%, transparent);
+  border-radius: 3px;
+}
+
+.pg-inline-scope { opacity: 0.78; }
+
+.pg-editor-wallpaper {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--pg-editor-bg) 38%, transparent), color-mix(in srgb, var(--pg-editor-bg) 38%, transparent)),
+    var(--pg-wallpaper-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: var(--pg-wallpaper-opacity, 0.16);
+}
+
+/* Editor frame state */
+.pg-editor-frame {
+  transition: border-color 0.2s ease;
+}
+.pg-editor-frame:focus-within {
+  border-color: color-mix(in srgb, var(--pg-accent) 54%, var(--pg-border));
+}
+
+/* Brand and active evaluation states */
+.pg-logo-badge {
+  background: var(--pg-surface-2);
+  color: var(--pg-accent);
+  border: 1px solid var(--pg-border);
+  border-radius: 6px;
+}
+.pg-eval-glow {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pg-accent) 60%, transparent);
+}
+kbd.pg-kbd {
+  font-family: var(--pg-editor-font);
+  font-size: 10px;
+  background: var(--pg-surface-3);
+  border: 1px solid var(--pg-border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  color: var(--pg-muted);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--pg-border);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--pg-muted); background-clip: content-box; }
+
+/* Range inputs */
+input[type="range"] {
+  accent-color: var(--pg-accent);
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--pg-border);
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* Numeric tabular */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Accent-tinted text selection inside the editor */
+.pg-editor::selection {
+  background: color-mix(in srgb, var(--pg-accent) 32%, transparent);
+}
+
+/* Keyboard focus */
+:focus-visible {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: 2px;
+}
