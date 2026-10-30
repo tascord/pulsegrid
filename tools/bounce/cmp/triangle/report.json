@@ -1,0 +1,16 @@
+{
+ "mode": "files",
+ "ref": "/home/519374d0-07bf-447b-8c84-f74f817bdc12/Documents/Projects/pulsegrid/_reference/triangle.wav",
+ "dut": "/home/519374d0-07bf-447b-8c84-f74f817bdc12/Documents/Projects/pulsegrid/tools/bounce/out/triangle.wav",
+ "lagMs": 10.816326530612244,
+ "lagScore": 0.9997151821147672,
+ "rmsDbRef": -21.47329889814766,
+ "rmsDbDut": -21.475773181728638,
+ "gainMatchDb": 3.031717883721967,
+ "residualDb": -53.91789005098322,
+ "envCorr": 0.9973067645880902,
+ "centroidDiffHz": 1.7147375237257028,
+ "bandDiff": 0.0000016721095111765875,
+ "onsetMatch": null,
+ "verdict": "TIGHT"
+}

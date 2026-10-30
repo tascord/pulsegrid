@@ -490,6 +490,32 @@ class PatternScheduler {
     this.trackChangeListeners.forEach((l) => l());
   }
 
+  /**
+   * Apply a persisted/manual scope/meter override onto a live track, keeping
+   * the inline `widgets` list in sync (mirrors what `.scope()`/`.meter()`
+   * do at eval time). Undefined = no override, leave the code value alone.
+   */
+  private applyScopeOverride(track: EvaluatedTrack, hasScope: unknown, hasMeter: unknown): void {
+    if (typeof hasScope === 'boolean') {
+      track.hasScope = hasScope;
+      track.widgets = track.widgets || [];
+      if (hasScope) {
+        if (!track.widgets.some((w) => w.type === 'scope')) track.widgets.push({ type: 'scope' });
+      } else {
+        track.widgets = track.widgets.filter((w) => w.type !== 'scope');
+      }
+    }
+    if (typeof hasMeter === 'boolean') {
+      track.hasMeter = hasMeter;
+      track.widgets = track.widgets || [];
+      if (hasMeter) {
+        if (!track.widgets.some((w) => w.type === 'meter')) track.widgets.push({ type: 'meter' });
+      } else {
+        track.widgets = track.widgets.filter((w) => w.type !== 'meter');
+      }
+    }
+  }
+
   private notifyQueue() {
     this.queueListeners.forEach((l) => l(this.queuedEvaluation?.quantize || null));
   }
@@ -568,6 +594,11 @@ class PatternScheduler {
     if (typeof patch.delaySend === 'number' && isFinite(patch.delaySend)) mixerPatch.delaySend = patch.delaySend;
     if (typeof patch.muted === 'boolean') mixerPatch.muted = patch.muted;
     if (typeof patch.solo === 'boolean') mixerPatch.solo = patch.solo;
+    if (typeof patch.hasScope === 'boolean' || typeof patch.hasMeter === 'boolean') {
+      this.applyScopeOverride(track, patch.hasScope, patch.hasMeter);
+      if (typeof patch.hasScope === 'boolean') mixerPatch.hasScope = patch.hasScope;
+      if (typeof patch.hasMeter === 'boolean') mixerPatch.hasMeter = patch.hasMeter;
+    }
     if (Object.keys(mixerPatch).length > 0) {
       try {
         persistTrackMixer(trackId, mixerPatch);
@@ -609,6 +640,7 @@ class PatternScheduler {
       if (isFinite(state.delaySend)) track.delaySend = Math.min(1, Math.max(0, state.delaySend));
       if (typeof state.muted === 'boolean') track.muted = state.muted;
       if (typeof state.solo === 'boolean') track.solo = state.solo;
+      this.applyScopeOverride(track, state.hasScope, state.hasMeter);
       changed = true;
       try {
         persistTrackMixer(id, state);
@@ -2212,6 +2244,7 @@ class PatternScheduler {
           if (Number.isFinite(state.delaySend)) track.delaySend = Math.min(1, Math.max(0, state.delaySend));
           if (typeof state.muted === 'boolean') track.muted = state.muted;
           if (typeof state.solo === 'boolean') track.solo = state.solo;
+          this.applyScopeOverride(track, state.hasScope, state.hasMeter);
         }
       } catch {
         /* persistence is best-effort */

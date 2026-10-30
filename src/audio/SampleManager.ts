@@ -18,11 +18,32 @@ class SampleManager {
   private bankStatus: Map<string, SampleBankStatus> = new Map();
   private audioCtx: AudioContext | null = null;
   private listeners: Set<() => void> = new Set();
+  /**
+   * Gesture-free decode context: `decodeAudioData` works on an
+   * OfflineAudioContext with no user gesture, so `samples(...)` in the
+   * editor loads banks immediately on eval instead of waiting for the
+   * first play press (which boots the realtime AudioContext).
+   */
+  private offlineCtx: OfflineAudioContext | null = null;
 
   public init(audioCtx: AudioContext) {
     const firstInit = !this.audioCtx;
     this.audioCtx = audioCtx;
     if (firstInit) this.generateBuiltinSamples();
+  }
+
+  /** Realtime context (null until first play), or an offline decode context. */
+  public getDecodeContext(): AudioContext | OfflineAudioContext | null {
+    if (this.audioCtx) return this.audioCtx;
+    try {
+      if (typeof OfflineAudioContext !== 'undefined') {
+        if (!this.offlineCtx) this.offlineCtx = new OfflineAudioContext(2, 1, 44100);
+        return this.offlineCtx;
+      }
+    } catch {
+      /* offline decode unavailable (e.g. bare Node) */
+    }
+    return null;
   }
 
   public getAudioContext(): AudioContext | null {

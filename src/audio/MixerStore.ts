@@ -18,6 +18,10 @@ export interface TrackMixerState {
   delaySend: number;
   muted: boolean;
   solo: boolean;
+  /** Inline scope visibility override. Undefined = no override (code wins). */
+  hasScope?: boolean;
+  /** Inline meter visibility override. Undefined = no override (code wins). */
+  hasMeter?: boolean;
 }
 
 export interface MasterMixerState {
@@ -71,6 +75,8 @@ function sanitizeTrack(raw: unknown): TrackMixerState | null {
     delaySend,
     muted: r.muted === true,
     solo: r.solo === true,
+    ...(typeof r.hasScope === 'boolean' ? { hasScope: r.hasScope } : {}),
+    ...(typeof r.hasMeter === 'boolean' ? { hasMeter: r.hasMeter } : {}),
   };
 }
 
@@ -131,6 +137,10 @@ export function persistTrackMixer(id: string, patch: Partial<TrackMixerState>): 
       muted: typeof patch.muted === 'boolean' ? patch.muted : (prev?.muted ?? false),
       solo: typeof patch.solo === 'boolean' ? patch.solo : (prev?.solo ?? false),
     };
+    const nextScope = typeof patch.hasScope === 'boolean' ? patch.hasScope : prev?.hasScope;
+    if (typeof nextScope === 'boolean') next.hasScope = nextScope;
+    const nextMeter = typeof patch.hasMeter === 'boolean' ? patch.hasMeter : prev?.hasMeter;
+    if (typeof nextMeter === 'boolean') next.hasMeter = nextMeter;
     current[id] = next;
     saveMixerState(current);
   } catch {

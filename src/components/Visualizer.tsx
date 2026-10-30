@@ -101,6 +101,26 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
 
+    // Keep the backing store matched to the displayed size so CSS scaling
+    // never stretches the drawing (the editor overlay and monitor have
+    // very different aspect ratios from the 640x200 fallback).
+    const hasSpectrogramFrameRef = { current: false };
+    const syncSize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.max(1, Math.round(rect.width * dpr));
+      const h = Math.max(1, Math.round(rect.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+        // A resize clears the frame; spectrogram scrolls from scratch.
+        hasSpectrogramFrameRef.current = false;
+      }
+    };
+    syncSize();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncSize) : null;
+    ro?.observe(canvas);
+
     // Resolved synchronously from the theme id (not a getComputedStyle
     // snapshot) so the colors match the newly selected theme on the same
     // render — child effects run before ThemeProvider writes the new CSS
@@ -113,7 +133,6 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({
     const grid = pal.grid;
     let timeData = new Uint8Array(512).fill(128);
     let freqData = new Uint8Array(512);
-    let hasSpectrogramFrame = false;
 
     const drawGrid = (width: number, height: number) => {
       ctx.strokeStyle = grid;
@@ -137,6 +156,7 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({
     };
 
     const render = () => {
+      syncSize();
       const width = canvas.width;
       const height = canvas.height;
       const analyser = audioEngine.masterAnalyser;
@@ -149,7 +169,12 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({
         analyser.getByteFrequencyData(freqData);
       }
 
-      if (mode === 'spectrogram' && hasSpectrogramFrame) {
+      if (mode === 'spectrogram' && hasSpectrogramFrameRef.current) {
+        // Scroll speed in CSS px, scaled to device px so HiDPI + wide
+        // canvases scroll at the same visual rate (was a fixed 2 device px,
+        // which crawled on large/HiDPI surfaces after the resize fix).
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const shift = Math.max(2, Math.round(2 * dpr));
         if (transparent) {
           ctx.globalCompositeOperation = 'destination-out';
           ctx.globalAlpha = 0.06;
@@ -158,8 +183,8 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({
           ctx.globalCompositeOperation = 'source-over';
           ctx.globalAlpha = 1;
         }
-        ctx.drawImage(canvas, -2, 0);
-        ctx.clearRect(width - 2, 0, 2, height);
+        ctx.drawImage(canvas, -shift, 0);
+        ctx.clearRect(width - shift, 0, shift, height);
       } else {
         ctx.clearRect(0, 0, width, height);
         if (!transparent) {
@@ -220,17 +245,20 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({
           ctx.fillRect(x, height - barHeight, barWidth, barHeight);
         }
       } else if (mode === 'spectrogram') {
-        for (let y = 0; y < height; y++) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const shift = Math.max(2, Math.round(2 * dpr));
+        const rowH = Math.max(1, Math.round(dpr));
+        for (let y = 0; y < height; y += rowH) {
           const ratio = 1 - y / height;
           const bin = Math.min(freqData.length - 1, Math.floor(ratio * ratio * freqData.length));
           const magnitude = freqData[bin] / 255;
           if (magnitude < 0.025) continue;
           ctx.globalAlpha = Math.min(0.9, magnitude * 1.4);
           ctx.fillStyle = magnitude > 0.62 ? accent2 : magnitude > 0.28 ? accent : accent3;
-          ctx.fillRect(width - 2, y, 2, 1);
+          ctx.fillRect(width - shift, y, shift, rowH);
         }
         ctx.globalAlpha = 1;
-        hasSpectrogramFrame = true;
+        hasSpectrogramFrameRef.current = true;
       } else if (mode === 'orbit') {
         const radius = Math.min(width, height) * 0.32;
         const cx = width / 2;
@@ -445,6 +473,7 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({
     render();
     return () => {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      ro?.disconnect();
     };
   }, [mode, transparent, themeId]);
 

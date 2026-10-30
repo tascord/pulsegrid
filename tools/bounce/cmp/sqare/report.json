@@ -1,0 +1,16 @@
+{
+ "mode": "files",
+ "ref": "/home/519374d0-07bf-447b-8c84-f74f817bdc12/Documents/Projects/pulsegrid/_reference/sqare.wav",
+ "dut": "/home/519374d0-07bf-447b-8c84-f74f817bdc12/Documents/Projects/pulsegrid/tools/bounce/out/sqare.wav",
+ "lagMs": 0,
+ "lagScore": 0.9997373090371338,
+ "rmsDbRef": -18.122495058482578,
+ "rmsDbDut": -18.12477686471463,
+ "gainMatchDb": 1.5817880557789563,
+ "residualDb": -50.91838256707384,
+ "envCorr": 0.999959023535338,
+ "centroidDiffHz": 44.70442557722509,
+ "bandDiff": 0.007302054885420155,
+ "onsetMatch": null,
+ "verdict": "TIGHT"
+}

@@ -1,5 +1,5 @@
 // PulseGrid event dump for the demo comparison tool.
-// Evaluates the REAL demo-pulsegrid.js through the REAL PatternScheduler
+// Evaluates the REAL demos/STRUDEL_DEMO.js through the REAL PatternScheduler
 // (evaluateCode + computePatternEvents) and writes out/pulsegrid-events.json
 // in the same schema as events-strudel.mjs (absolute seconds, effective MIDI,
 // per-event gain/pan/cutoff). Track ids are mapped to the canonical part
@@ -33,7 +33,7 @@ const TRACK2PART = {
   lead_top: 'sparkle',
 };
 
-const code = fs.readFileSync(path.join(here, '../../demo-pulsegrid.js'), 'utf8');
+const code = fs.readFileSync(path.join(here, '../../demos/STRUDEL_DEMO.js'), 'utf8');
 const res = patternScheduler.evaluateCode(code);
 if (!res.success) {
   console.error('EVAL FAILED: ' + res.error);

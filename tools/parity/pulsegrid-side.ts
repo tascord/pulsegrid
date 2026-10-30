@@ -1,4 +1,4 @@
-// PulseGrid side of the parity check: evaluates the real demo-pulsegrid.js
+// PulseGrid side of the parity check: evaluates the real demos/STRUDEL_DEMO.js
 // through the real PatternScheduler (evaluateCode + computePatternEvents)
 // and prints one JSON object per line: {track, start, end, value}
 // (times in cycles; pitched values as effective MIDI numbers).
@@ -9,7 +9,7 @@ import { patternScheduler } from '../../src/audio/PatternScheduler';
 import { noteToMidi } from '../../src/audio/MiniNotationParser';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const code = fs.readFileSync(path.join(here, '../../demo-pulsegrid.js'), 'utf8');
+const code = fs.readFileSync(path.join(here, '../../demos/STRUDEL_DEMO.js'), 'utf8');
 const res = patternScheduler.evaluateCode(code);
 if (!res.success) {
   console.error('EVAL FAILED: ' + res.error);

@@ -56,6 +56,28 @@ function isAbsoluteUrl(v: string): boolean {
   return /^(https?:|blob:|data:)/i.test(v);
 }
 
+/**
+ * Cross-origin sample fetches go through the same-origin proxy
+ * (GET /api/sample-proxy?url=...) so the editor loads them without
+ * browser CORS/mixed-content failures. Same-origin relative paths
+ * (e.g. `/samples/...`) fetch directly.
+ */
+export function proxiedUrl(url: string): string {
+  if (/^https?:/i.test(url)) {
+    // Already proxied, or running outside a browser (CLI bounce): leave alone.
+    if (url.includes('/api/sample-proxy?')) return url;
+    if (typeof window === 'undefined' || typeof window.location === 'undefined') return url;
+    try {
+      const absolute = new URL(url, window.location.href);
+      if (absolute.origin === window.location.origin) return url;
+    } catch {
+      return url;
+    }
+    return `/api/sample-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 /** Fetch a `strudel.json`-style map from the supported shorthands. */
 export async function fetchSampleMap(url: string): Promise<[unknown, string]> {
   let resolved = resolveSpecialPaths(url);
@@ -69,7 +91,7 @@ export async function fetchSampleMap(url: string): Promise<[unknown, string]> {
     throw new Error(`cannot fetch sample map "${url}" (no fetch in this environment)`);
   }
   const base = getBaseURL(resolved);
-  const json = await fetch(resolved).then((res) => {
+  const json = await fetch(proxiedUrl(resolved)).then((res) => {
     if (!res.ok) throw new Error(`error loading "${url}" (HTTP ${res.status})`);
     return res.json();
   });
@@ -116,7 +138,7 @@ export function processSampleMap(
 
 const bufferCache = new Map<string, Promise<AudioBuffer>>();
 
-function decodeWithContext(ctx: AudioContext, raw: ArrayBuffer): Promise<AudioBuffer> {
+function decodeWithContext(ctx: AudioContext | OfflineAudioContext, raw: ArrayBuffer): Promise<AudioBuffer> {
   // decodeAudioData detaches the input in some browsers; copy defensively.
   const copy = raw.slice(0);
   const p = ctx.decodeAudioData(copy);
@@ -136,10 +158,10 @@ function decodeWithContext(ctx: AudioContext, raw: ArrayBuffer): Promise<AudioBu
 export function loadBufferCached(url: string): Promise<AudioBuffer> | null {
   const cached = bufferCache.get(url);
   if (cached) return cached;
-  const ctx = sampleManager.getAudioContext();
+  const ctx = sampleManager.getDecodeContext();
   if (!ctx) return null;
   const task = (async () => {
-    const res = await fetch(url.replace('#', '%23'));
+    const res = await fetch(proxiedUrl(url.replace('#', '%23')));
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
     const raw = await res.arrayBuffer();
     return decodeWithContext(ctx, raw);
@@ -161,8 +183,8 @@ export async function importSampleUrl(url: string, name?: string): Promise<void>
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, '_')
     .slice(0, 48) || 'remote';
-  const ctx = sampleManager.getAudioContext();
-  if (!ctx) throw new Error('AudioContext not initialized (press play first)');
+  const ctx = sampleManager.getDecodeContext();
+  if (!ctx) throw new Error('No audio decode path available in this environment');
   sampleManager.setBankStatus(bank, { total: 1, loaded: 0, pending: true });
   try {
     const task = loadBufferCached(clean);
@@ -238,8 +260,8 @@ export async function loadSamples(
     (key, bank) => {
       const lower = key.toLowerCase();
       names.push(lower);
-      if (!sampleManager.getAudioContext()) {
-        // Defer until the engine boots (first play press pumps the queue).
+      if (!sampleManager.getDecodeContext()) {
+        // No decode path at all (bare Node): defer until the engine boots.
         sampleManager.setBankStatus(lower, { total: bank.length, loaded: 0, pending: true });
         pendingBanks.push({ key: lower, bank });
       } else {

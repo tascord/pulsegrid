@@ -6,7 +6,6 @@ import {
   VolumeX,
   Sliders,
   Music,
-  Cpu,
   Disc,
   Share2,
   Layers,
@@ -18,7 +17,7 @@ import {
 import { patternScheduler } from '../audio/PatternScheduler';
 import { audioEngine } from '../audio/AudioEngine';
 
-export type DrawerTab = 'mixer' | 'patterns' | 'instruments' | 'samples' | 'midi' | 'logs' | 'style' | 'docs' | null;
+export type DrawerTab = 'mixer' | 'patterns' | 'samples' | 'midi' | 'logs' | 'style' | 'docs' | null;
 
 interface NavbarProps {
   activeTab: DrawerTab;
@@ -156,7 +155,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       >
         {tabBtn('mixer', <Sliders className="w-3.5 h-3.5" />, 'Mixer')}
         {tabBtn('patterns', <Layers className="w-3.5 h-3.5" />, 'Patterns')}
-        {tabBtn('instruments', <Cpu className="w-3.5 h-3.5" />, 'Synths')}
         {tabBtn('samples', <Disc className="w-3.5 h-3.5" />, 'Samples')}
         {tabBtn('midi', <Music className="w-3.5 h-3.5" />, 'MIDI')}
         {tabBtn('logs', <ScrollText className="w-3.5 h-3.5" />, 'Logs')}

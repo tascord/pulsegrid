@@ -5,7 +5,6 @@ import { CodeEditor } from './components/CodeEditor';
 import { Visualizer, type VisualizerMode } from './components/Visualizer';
 import { MixerConsole } from './components/MixerConsole';
 import { PatternDrawer } from './components/PatternDrawer';
-import { InstrumentDrawer } from './components/InstrumentDrawer';
 import { SampleDrawer } from './components/SampleDrawer';
 import { MidiDrawer } from './components/MidiDrawer';
 import { LogsDrawer } from './components/LogsDrawer';
@@ -24,7 +23,11 @@ const CPM_KEY = 'pulsegrid-cpm-v1';
 const INSPECTOR_WIDTH_KEY = 'pulsegrid-inspector-width-v1';
 const ACTIVE_TAB_KEY = 'pulsegrid-active-tab-v1';
 const LAST_ACTIVE_TAB_KEY = 'pulsegrid-last-tab-v1';
-const VALID_TABS = ['mixer', 'patterns', 'instruments', 'samples', 'midi', 'logs', 'style', 'docs'] as const;
+const VIS_MODE_KEY = 'pulsegrid-visualizer-mode-v1';
+const VIS_OVERLAY_KEY = 'pulsegrid-visualizer-overlay-v1';
+const VIS_OPACITY_KEY = 'pulsegrid-visualizer-opacity-v1';
+const VALID_VIS_MODES = ['scope', 'spectrum', 'waveform', 'spectrogram', 'orbit', 'particles', 'levels', 'steps', 'pianoroll', 'spiral', 'pitchwheel'] as const;
+const VALID_TABS = ['mixer', 'patterns', 'samples', 'midi', 'logs', 'style', 'docs'] as const;
 const INSPECTOR_MIN = 300;
 const INSPECTOR_MAX = 1200;
 const INSPECTOR_DEFAULT = 420;
@@ -36,243 +39,25 @@ const INSPECTOR_COLLAPSE_BELOW = 240;
 // Dragging the collapsed strip this far left expands the sidebar again.
 const INSPECTOR_EXPAND_ABOVE = 24;
 
-const DEFAULT_CODE = `// Reusable patterns
+import { parseDemoFile } from './demos';
 
-defPattern("kick_groove", "bd ~ bd [~ bd]");
-defPattern("hats", "[~ hh*2] [~ hh] [~ hh*2] [oh ~]");
-defPattern("clap_snare", "~ cp ~ [cp*2 ~]");
-defPattern("acid_riff", "c2 [c2 eb2] g2 [bb2 c3]");
+// Demos are the single source of truth in demos/ (UPPERCASE filenames,
+// `_` renders as a space). Vite inlines them as raw text at build time;
+// server.ts and tools/ read the same folder with fs.
+const demoModules = import.meta.glob<string>('../demos/*.js', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const DEMOS = Object.entries(demoModules)
+  .map(([file, code]) => parseDemoFile(file, code))
+  .sort((a, b) => a.file.localeCompare(b.file));
 
-track("kick").pattern("kick_groove").gain(0.95).scope();
-track("hats").pattern("hats").gain(0.7).pan(0.15);
-track("clap").pattern("clap_snare").gain(0.8).reverb(0.25);
-track("acid").pattern("acid_riff")
-  .synth("acid_303")
-  .cutoff(1200)
-  .res(12)
-  .delay(0.35)
-  .gain(0.85)
-  .scope();
-`;
+const DEFAULT_CODE = DEMOS[0]?.code ?? '';
+const DEFAULT_CPM = DEMOS[0]?.cpm ?? 132;
 
-const PRESETS = [
-  { name: 'Acid 303', cpm: 33, code: DEFAULT_CODE },
-  {
-    name: 'Liquid DnB',
-    cpm: 43.5,
-    code: `// Liquid drum and bass
-defPattern("amen_slices", "amen:0 [amen:1 amen:2] amen:0 [amen:3 ~]");
-defPattern("sub_roller", "f1 ~ [f1 ab1] c2");
-defPattern("lush_pad", "c3 [eb3 g3] [bb3 ~] d4");
+const PRESETS = DEMOS.map((d) => ({ name: d.name, cpm: d.cpm ?? 132, code: d.code }));
 
-track("drums").pattern("amen_slices").gain(0.9).scope();
-track("sub").pattern("sub_roller").synth("sub_bass").lpf(320).gain(0.9);
-track("atmosphere").pattern("lush_pad")
-  .synth("poly_saw")
-  .slow(2)
-  .reverb(0.5)
-  .delay(0.4)
-  .gain(0.65)
-  .scope();`,
-  },
-  {
-    name: 'FM Ambient',
-    cpm: 22.5,
-    code: `// FM ambient
-defPattern("chimes", "[c4, eb4, g4] [bb4 d5] [f4, ab4] c5");
-defPattern("drone", "c2/2 ~ g2/2 ~");
-defPattern("click_perc", "rim(3,8) [~ hh(5,8)]");
-
-track("bells").pattern("chimes")
-  .synth("fm_bell")
-  .fast(1.5)
-  .reverb(0.6)
-  .delay(0.3)
-  .gain(0.7)
-  .scope();
-track("bass").pattern("drone").synth("sub_bass").gain(0.75);
-track("clicks").pattern("click_perc").gain(0.55).pan(-0.2);`,
-  },
-  {
-    name: 'Euclidean',
-    cpm: 31.5,
-    code: `// Euclidean rhythm
-defPattern("euc_kick", "bd(3,8)");
-defPattern("euc_snare", "~ [sd cp] ~ sd");
-defPattern("euc_hats", "hh(5,8)");
-defPattern("synth_pluck", "c3 [g3 bb3] [f3 ~] eb3");
-
-track("kick").pattern("euc_kick").gain(0.9).scope();
-track("snare").pattern("euc_snare").gain(0.85).reverb(0.2);
-track("hats").pattern("euc_hats").gain(0.65).pan(0.2);
-track("pluck").pattern("synth_pluck").synth("pluck").res(5).cutoff(2200).delay(0.3).gain(0.8).scope();`,
-  },
-  {
-    name: 'Strudel Demo',
-    cpm: 158,
-    code: `// Full demo.strudel in the track() DSL — all FX live.
-// Numbers are raw MIDI (effective MIDI = number + 12 * octave); .set("D") is a parity no-op.
-cpm(158);
-
-import {
-  ry30_bd as bd,
-  ry30_oh as oh,
-  ry30_cp as cp,
-  ry30_hh as hh,
-  wt_digital_bad_day,
-} from 'ry30';
-
-track("bass_sq").note("<6@4 5@3.5 1@8.5>").set("D").oct(3).s("square").lpf(2000).orbit(2);
-track("bass_saw").note("<6@4 5@3.5 1@8.5>").set("D").oct(2).s("saw").lpf(2000).orbit(2);
-track("bass_tri").note("<6@4 5@3.5 1@8.5>").set("D").oct(1).s("triangle").lpf(2000).orbit(2);
-track("kick").sound("<bd:4 bd:4 bd:4 bd:4>").gain(0.9).lpf(1000).duckorbit(2).duckattack(0.02).duckdepth(1).room(1);
-track("hh").sound("[hh hh hh hh]").att(0.005).decay(0.15).gain(0.56).room(1);
-track("oh").sound("[oh ~ oh ~]").att(0.005).decay(0.15).gain(0.25).room(1);
-track("cp").sound("<~ cp ~ cp>").gain(0.75).att(0.05).room(1);
-track("lead_chords").note("<[6, 8, 10, 13]@4 [3, 5, 8, 10]@3.5 [1, 3, 5, 8]@8.5>").set("D").oct("<4 5>").s("saw").lpf(1600).gain(0.35).size(0.8).chorus(1.4).delay(0.12).delayfeedback(0.25);
-track("lead_wt").note("[ 1*2 [3 5] [6 8] [~ 5] | [8 10] [8 5] [3 5] [1 0] ]").set("D").oct("<4 5 4 6>").s("wt_digital_bad_day").gain(0.63).slow(2).distort(0.4).crush("<4 4 4 6>").delay(0.25).delaytime(0.1875).delayfeedback(0.45).pan(sine.slow(0.1).range(0,1)).att(0.05).vib(0.1).color("pink").log();
-track("lead_top").note("[1 ~ 8 ~ 10 ~ 13 ~]").set("D").oct("<5 6 5 6>").s("saw").gain(0.18).legato(1).release(0.5).chorus(1).pan(sine.slow(0.5)).delay(0.5).delayfeedback(0.65).room(0.8).lpf(sine.range(2500,7000).slow(4));`,
-  },
-  {
-    name: 'Peak Techno',
-    cpm: 34.5,
-    code: `// Peak-time techno — pumping sidechain, rolling rumble, LFO hats.
-cpm(34.5);
-
-defPattern("k", "bd bd bd bd");
-defPattern("rumble", "~ [bd ~] ~ [bd*2 ~]");
-defPattern("hats", "[hh hh? hh hh] [oh hh hh hh?]");
-defPattern("tops", "[perc perc? cb] [perc cb perc?]");
-defPattern("clap", "~ ~ cp ~");
-defPattern("bass", "c1 [c1 c1] c1 [c1 g1]");
-defPattern("stab", "[eb3, g3, bb3] ~ [f3, ab3, c4] ~");
-defPattern("acid", "c2 [c2 eb2] g2 [bb2 c3]");
-
-track("kick").pattern("k").gain(0.95).lpf(900).duckorbit(2).duckattack(0.015).duckdepth(1).room(0.5).scope();
-track("rumble").pattern("rumble").gain(0.5).lpf(180).orbit(2).distort(0.35).shape(0.4).scope();
-track("hats").pattern("hats").gain(slider(0.6, 0, 1)).pan(sine.slow(8).range(-0.6, 0.6)).att(0.004).decay(0.12).room(0.5).swing(0.06).cut(1);
-track("tops").pattern("tops").gain(0.4).pan(saw.slow(4).range(-0.5, 0.5)).decay(0.1).room(0.6).stut(2, 0.4, 0.03).degrade(0.1);
-track("clap").pattern("clap").gain(0.8).room(0.4).delay(0.2).delayfeedback(0.3).stut(3, 0.5, 0.04);
-track("bass").pattern("bass").synth("sub_bass").gain(0.9).lpf(320).orbit(2).slide(0.05).compressor(-14, 4, 0.003, 0.2).scope();
-track("stab").pattern("stab").synth("poly_saw").gain(0.5).lpf(sine.range(900, 3800).slow(4)).res(6).chorus(0.8).delay(0.35).delaytime(0.28).delayfeedback(0.4).jux().pianoroll();
-track("acid").pattern("acid").synth("acid_303").gain(0.7).cutoff(sine.range(500, 4500).slow(2)).res(14).drive(0.5).delay(0.25).orbit(2).spectrum();`,
-  },
-  {
-    name: 'Jungle Science',
-    cpm: 43,
-    code: `// Jungle science — chopped Amen, Reese bass, ragga pressure.
-cpm(43);
-
-defPattern("amen_main", "amen:0 [amen:1 amen:2] amen:0 [amen:3 ~]");
-defPattern("amen_ghost", "[~ amen:1] [amen:2 ~] [amen:3 amen:1] ~");
-defPattern("kick", "bd ~ [~ bd] ~");
-defPattern("snare", "~ ~ sd ~");
-defPattern("hats", "hh(5,8)");
-defPattern("sub", "f1 ~ [~ f1] c2");
-defPattern("reese", "[f2, c3] ~ [g2, d3] ~");
-defPattern("keys", "[a3, c4, e4] ~ [g3, bb3, d4] ~");
-
-track("break").pattern("amen_main").gain(0.9).lpf(6500).room(0.25).chop(2).scope();
-track("ghost").pattern("amen_ghost").gain(0.55).hpf(1200).striate(4).rev().pan(sine.slow(2).range(-0.7, 0.7)).room(0.4);
-track("kick").pattern("kick").gain(0.9).lpf(800).duckorbit(2).duckattack(0.01).duckdepth(1);
-track("snare").pattern("snare").gain(0.85).room(0.35).delay(0.25).delayfeedback(0.4).stut(2, 0.5, 0.05);
-track("hats").pattern("hats").gain(0.55).pan(0.2).att(0.003).decay(0.08).cut(1).iter(2).swing(0.1);
-track("sub").pattern("sub").synth("sub_bass").gain(0.95).lpf(300).orbit(2).legato(1.4).slide(0.06).scope();
-track("reese").pattern("reese").synth("saw").gain(0.5).lpf(900).res(8).detune(10).unison(2).spread(0.5).vowel("a").distort(0.3).orbit(2).palindrome().pianoroll();
-track("keys").pattern("keys").synth("fm_bell").gain(0.5).slow(2).reverb(0.55).delay(0.4).delayfeedback(0.5).chorus(0.7).jux().spectrum();`,
-  },
-  {
-    name: 'Deep House',
-    cpm: 30.5,
-    code: `// Deep house — warm Rhodes, garage swing, wide night bus.
-cpm(30.5);
-
-defPattern("kick", "bd bd bd bd");
-defPattern("hats", "[hh hh] [oh hh?]");
-defPattern("groove", polyrhythm("hh(5,8)", "perc(3,8)"));
-defPattern("snare", "~ [cp sd] ~ [cp ~]");
-defPattern("bass", "f1 ~ f1 [~ g1]");
-defPattern("arp", "f3 [ab3 c4] [eb4 c4] ab3");
-
-track("kick").pattern("kick").gain(0.92).lpf(750).duckorbit(2).duckattack(0.02).duckdepth(1).room(0.4).scope();
-track("hats").pattern("hats").gain(slider(0.55, 0, 1)).pan(sine.slow(8).range(-0.5, 0.5)).decay(0.1).room(0.5).swing(0.12).cut(1);
-track("groove").pattern("groove").gain(0.4).room(0.5).delay(0.2).struct("t t f t").degrade(0.15);
-track("snare").pattern("snare").gain(0.75).room(0.45).delay(0.3).delayfeedback(0.35).late(0.015);
-track("bass").pattern("bass").synth("sub_bass").gain(0.9).lpf(280).orbit(2).slide(0.08).legato(1.3).compressor(-12, 4, 0.005, 0.25).scope();
-track("rhodes").note(slowcat(chord("F3m7"), chord("Eb3maj7"), chord("D3m7"), chord("C3m7"))).synth("poly_saw").gain(0.5).lpf(2200).res(3).chorus(0.6).phaser(0.8).phaserDepth(900).leslie(0.5).delay(0.3).reverb(0.4).jux().pianoroll();
-track("arp").pattern("arp").synth("pluck").gain(0.45).cutoff(perlin.slow(3).range(1200, 5200)).res(7).delay(0.35).delaytime(0.24).delayfeedback(0.5).tremolo(5).pan(rand.slow(4).range(-0.6, 0.6)).spectrum();
-track("vocal").pattern("[~ perc] ~ [cb ~] ~").gain(0.35).room(0.6).delay(0.4).delayfeedback(0.55).stut(3, 0.45, 0.06).superimpose().early(0.02);`,
-  },
-  {
-    name: 'IDM Glitch',
-    cpm: 37,
-    code: `// IDM glitch — generative percussion, morphing blips, drifting pad.
-cpm(37);
-
-defPattern("kick", "bd(3,8)");
-defPattern("snare", "~ [sd sd?] ~ [sd ~]");
-defPattern("hats", "hh*3 [hh? hh] [~ hh*2] hh?");
-defPattern("blips", "[c5 eb5] [g5 ~] [bb4 c5] [d5 ~]");
-defPattern("bass", "c2 [~ g1] [c2 ~] [eb2 ~]");
-defPattern("pads", "[f3, ab3, c4] [g3, bb3, eb4]");
-defPattern("tex", "{bd hh, perc rim}");
-
-track("kick").pattern("kick").gain(0.9).lpf(1000).duckorbit(2).duckattack(0.01).duckdepth(1).struct("t f t t").iter(1).scope();
-track("snare").pattern("snare").gain(0.7).room(0.5).delay(0.3).delayfeedback(0.45).degrade(0.2).early(0.03).stut(2, 0.4, 0.02);
-track("hats").pattern("hats").gain(0.5).pan(rand.slow(2).range(-0.8, 0.8)).hpf(4000).decay(0.06).cut(1).chop(3).late(0.02);
-track("blips").pattern("blips").synth("chiptune").gain(0.45).lpf(perlin.slow(3).range(800, 7000)).crush("<12 8 6 4>").striate(4).rev().delay(0.4).delayfeedback(0.6).pianoroll();
-track("bass").pattern("bass").synth("sine").gain(0.85).lpf(400).orbit(2).slide(0.12).legato(1.6).shape(0.3).coarse(10).palindrome().scope();
-track("pads").pattern("pads").synth("fm_bell").gain(slider(0.5, 0, 1)).slow(2).reverb(0.6).chorus(0.9).fshift(30).warp(0.4).superimpose().spectrum();
-track("tex").pattern("tex").gain(0.3).room(0.7).delay(0.5).delayfeedback(0.6).hurry(1.5).ply(2).jux().spiral();
-track("wob").pattern("c3 ~ [eb3 ~]").synth("saw").gain(0.35).cutoff(sine.range(300, 3000).slow(5)).res(10).vib(6).tremolo(7).drive(0.4).phaser(1.2).dry(0.6);`,
-  },
-  {
-    name: 'Trance Euphoria',
-    cpm: 35,
-    code: `// Trance euphoria — supersaw anthem, gated pads, hands-in-the-air lead.
-cpm(35);
-
-defPattern("kick", "bd bd bd bd");
-defPattern("offbass", "~ c3 ~ [c3 c3]");
-defPattern("hats", "[hh hh hh hh] [oh hh hh hh]");
-defPattern("clap", "~ ~ cp ~");
-defPattern("prog", slowcat("[c3, eb3, g3]", "[ab2, c3, eb3]", "[f2, ab2, c3]", "[g2, bb2, d3]"));
-defPattern("arp", "c4 [eb4 g4] [ab4 g4] [eb4 c4]");
-defPattern("spark", "[c6 ~ eb6 ~] [g6 ~ bb6 ~]");
-
-track("kick").pattern("kick").gain(0.95).lpf(850).duckorbit(2).duckattack(0.012).duckdepth(1).room(0.4).scope();
-track("offbass").pattern("offbass").synth("sawtooth").gain(0.7).lpf(500).orbit(2).slide(0.04).legato(0.9).compressor(-12, 5, 0.003, 0.2).scope();
-track("hats").pattern("hats").gain(0.5).pan(sine.slow(8).range(-0.4, 0.4)).decay(0.09).room(0.45).cut(1).swing(0.05);
-track("clap").pattern("clap").gain(0.8).room(0.5).delay(0.28).delayfeedback(0.4).stut(4, 0.5, 0.03);
-track("saw").pattern("prog").synth("poly_saw").gain(0.55).lpf(3200).res(4).unison(4).detune(14).spread(0.6).chorus(0.9).delay(0.3).delaytime(0.26).delayfeedback(0.45).reverb(0.4).superimpose().pianoroll();
-track("lead").pattern("arp").synth("square").gain(slider(0.5, 0, 1)).oct("<4 5>").legato(1.1).slide(0.07).vib(5).delay(0.4).delayfeedback(0.55).chorus(0.7).room(0.5).spectrum();
-track("pad").pattern("prog").synth("saw").gain(0.35).slow(2).lpf(sine.range(600, 2800).slow(4)).attack(0.4).release(1.2).chorus(1).reverb(0.6).jux().spiral();
-track("pluck").pattern("spark").synth("pluck").gain(0.4).fast(1.5).cutoff(perlin.slow(2).range(2000, 8000)).delay(0.45).delayfeedback(0.6).room(0.6).sometimes().wordfall();`,
-  },
-  {
-    name: 'LoFi Boom-Bap',
-    cpm: 21.5,
-    code: `// LoFi boom-bap — dusty drums, sleepy Rhodes, tape wobble.
-cpm(21.5);
-
-defPattern("kick", "bd ~ [bd ~] ~");
-defPattern("snare", "~ ~ sd [~ sd?]");
-defPattern("hats", "hh(5,8)");
-defPattern("crackle", "[perc? rim?] [~ perc?] [cb? ~] [perc ~]");
-defPattern("rhodes", slowcat(chord("C3maj7"), chord("A2m7"), chord("D3m7"), chord("G3m7")));
-defPattern("bass", "c2 ~ [~ a1] d2");
-defPattern("lick", "e4 [~ d4] [c4 ~] [a3 ~]");
-
-track("kick").pattern("kick").gain(0.9).lpf(600).room(0.3).late(0.01).scope();
-track("snare").pattern("snare").gain(0.8).room(0.5).delay(0.25).delayfeedback(0.35).degrade(0.1).swing(0.2);
-track("hats").pattern("hats").gain(0.5).lpf(5000).decay(0.12).swing(0.28).cut(1).degrade(0.2).pan(rand.slow(8).range(-0.4, 0.4));
-track("crackle").pattern("crackle").gain(0.3).hpf(3000).coarse(10).room(0.6).degrade(0.4).sometimes();
-track("rhodes").pattern("rhodes").synth("fm_bell").gain(slider(0.6, 0, 1)).lpf(2400).tremolo(3).chorus(0.5).leslie(0.4).delay(0.35).reverb(0.5).slow(2).pianoroll();
-track("bass").pattern("bass").synth("sub_bass").gain(0.85).lpf(260).legato(1.8).slide(0.1).vowel("o").scope();
-track("lick").pattern("lick").synth("pluck").gain(0.45).cutoff(2800).res(5).delay(0.4).delayfeedback(0.5).room(0.5).vib(4).late(0.02).stut(2, 0.4, 0.05).spectrum();
-track("pad").pattern("[c3, g3] ~ [a2, e3] ~").synth("sine").gain(0.3).slow(2).attack(0.5).release(1.5).reverb(0.6).chorus(0.8).jux();`,
-  },
-];
 
 function loadInitialCode(): string {
   try {
@@ -306,6 +91,30 @@ function loadLastTab(): Exclude<DrawerTab, null> {
     if (raw && (VALID_TABS as readonly string[]).includes(raw)) return raw as Exclude<DrawerTab, null>;
   } catch {}
   return 'mixer';
+}
+
+function loadVisualizerMode(): VisualizerMode {
+  try {
+    const raw = localStorage.getItem(VIS_MODE_KEY);
+    if (raw && (VALID_VIS_MODES as readonly string[]).includes(raw)) return raw as VisualizerMode;
+  } catch {}
+  return 'scope';
+}
+
+function loadVisualizerOverlay(): boolean {
+  try {
+    return localStorage.getItem(VIS_OVERLAY_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function loadVisualizerOpacity(): number {
+  try {
+    const v = parseFloat(localStorage.getItem(VIS_OPACITY_KEY) || '');
+    if (Number.isFinite(v)) return Math.min(0.45, Math.max(0.05, v));
+  } catch {}
+  return 0.2;
 }
 
 function AppInner() {
@@ -453,9 +262,22 @@ function AppInner() {
   };
 
   const [trackCount, setTrackCount] = useState<number>(() => patternScheduler.getEvaluatedTracks().length);
-  const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>('scope');
-  const [visualizerOverlay, setVisualizerOverlay] = useState(false);
-  const [visualizerOpacity, setVisualizerOpacity] = useState(0.2);
+  const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>(loadVisualizerMode);
+  const [visualizerOverlay, setVisualizerOverlay] = useState<boolean>(() => {
+    // Steps view is monitor-only — never restore an overlay with it.
+    if (loadVisualizerMode() === 'steps') return false;
+    return loadVisualizerOverlay();
+  });
+  const [visualizerOpacity, setVisualizerOpacity] = useState<number>(loadVisualizerOpacity);
+
+  // Persist the monitor scope status so a reload restores the mode + overlay.
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIS_MODE_KEY, visualizerMode);
+      localStorage.setItem(VIS_OVERLAY_KEY, visualizerOverlay ? '1' : '0');
+      localStorage.setItem(VIS_OPACITY_KEY, String(visualizerOpacity));
+    } catch {}
+  }, [visualizerMode, visualizerOverlay, visualizerOpacity]);
   const [inspectorWidth, setInspectorWidth] = useState<number>(loadInspectorWidth);
   const [isPoppedOut, setIsPoppedOut] = useState<boolean>(false);
   const resizeStart = useRef<{ x: number; width: number } | null>(null);
@@ -590,7 +412,7 @@ function AppInner() {
 
       {/* mobile tab strip */}
       <div className="md:hidden flex gap-1.5 px-3 py-1.5 overflow-x-auto text-[11px]" style={{ background: 'var(--pg-header-bg)' }}>
-        {(['mixer', 'patterns', 'instruments', 'samples', 'midi', 'logs', 'style', 'docs'] as const).map((t) => (
+        {(['mixer', 'patterns', 'samples', 'midi', 'logs', 'style', 'docs'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setActiveTab(activeTab === t ? null : t)}
@@ -626,7 +448,7 @@ function AppInner() {
             ))}
             <button
               onClick={() => {
-                if (confirm('Restore the default session patterns?')) handleLoadProject(DEFAULT_CODE, 132);
+                if (confirm('Restore the default session patterns?')) handleLoadProject(DEFAULT_CODE, DEFAULT_CPM);
               }}
               className="px-2 py-1.5 rounded-md pg-faint hover:opacity-80"
               title="Reset session"
@@ -749,7 +571,6 @@ function AppInner() {
             <div className="flex-1 overflow-hidden min-h-0">
               {activeTab === 'mixer' && <MixerConsole />}
               {activeTab === 'patterns' && <PatternDrawer />}
-              {activeTab === 'instruments' && <InstrumentDrawer />}
               {activeTab === 'samples' && <SampleDrawer />}
               {activeTab === 'midi' && <MidiDrawer />}
               {activeTab === 'logs' && <LogsDrawer />}
@@ -809,7 +630,6 @@ function AppInner() {
               <div className="flex-1 overflow-hidden min-h-0">
                 {activeTab === 'mixer' && <MixerConsole />}
                 {activeTab === 'patterns' && <PatternDrawer />}
-                {activeTab === 'instruments' && <InstrumentDrawer />}
                 {activeTab === 'samples' && <SampleDrawer />}
                 {activeTab === 'midi' && <MidiDrawer />}
                 {activeTab === 'logs' && <LogsDrawer />}

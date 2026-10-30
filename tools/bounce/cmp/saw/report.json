@@ -1,0 +1,16 @@
+{
+ "mode": "files",
+ "ref": "/home/519374d0-07bf-447b-8c84-f74f817bdc12/Documents/Projects/pulsegrid/_reference/saw.wav",
+ "dut": "/home/519374d0-07bf-447b-8c84-f74f817bdc12/Documents/Projects/pulsegrid/tools/bounce/out/saw.wav",
+ "lagMs": 54.058956916099774,
+ "lagScore": 0.997370427310622,
+ "rmsDbRef": -22.879589444071268,
+ "rmsDbDut": -22.902459161029686,
+ "gainMatchDb": 1.677962977717089,
+ "residualDb": -45.67625449558773,
+ "envCorr": 0.9765719668420357,
+ "centroidDiffHz": 11.689708858196873,
+ "bandDiff": 0.005671094221672562,
+ "onsetMatch": null,
+ "verdict": "TIGHT"
+}

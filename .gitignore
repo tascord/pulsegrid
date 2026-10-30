@@ -2,6 +2,10 @@ node_modules/
 build/
 dist/
 coverage/
+data/
+*.db
+*.db-shm
+*.db-wal
 .DS_Store
 *.log
 .env*
@@ -17,3 +21,5 @@ devenv.local.yaml
 
 # pre-commit
 .pre-commit-config.yaml
+
+_reference/

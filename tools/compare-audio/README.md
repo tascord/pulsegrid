@@ -26,7 +26,7 @@ node tools/compare-audio/compare.mjs files strudel-bounce.wav pulsegrid-bounce.w
 1. `events-strudel.mjs` queries the **real vendored Strudel scheduler**
    (`queryArc`, same ground truth as the parity tool) over `demo.strudel`'s
    patterns — including per-event controls (`gain`, `cutoff`, `pan`, `s`, `n`).
-2. `events-pulsegrid.mjs` evaluates the **real `demo-pulsegrid.js`** through the
+2. `events-pulsegrid.mjs` evaluates the **real `demos/STRUDEL_DEMO.js`** through the
    **real `PatternScheduler`** (`evaluateCode` + `computePatternEvents`).
 3. Both event lists are rendered through **one shared neutral DSP chain**
    (`lib/render.mjs`: pure osc / sample playback, linear ADSR, static LPF,
